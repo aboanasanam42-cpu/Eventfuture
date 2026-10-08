@@ -50,9 +50,9 @@ class MexcEventBot:
         self.last_reset_day = datetime.now(timezone.utc).day
 
         logger.info("=" * 60)
-        logger.info("🚀 MEXC EVENT FUTURES (عقود الأحداث) 10-MINUTE BOT ACTIVE")
+        logger.info("MEXC EVENT FUTURES 10-MINUTE PAPER SIMULATOR ACTIVE — NO REAL ORDERS")
         logger.info(f"Target: {SYMBOL} | Expiry Cycle: {CYCLE_MINUTES} Minutes | Mode: {TRADING_MODE.upper()}")
-        logger.info(f"Fixed Stake: {TRADE_AMOUNT} USDT | Payout: 80% (Gross Return: ${TRADE_AMOUNT * 1.8:.2f})")
+        logger.info(f"Simulation stake: {TRADE_AMOUNT} USDT | Assumed payout: 80% (not an exchange quote)")
         logger.info(f"Risk Limits: Stop at {MAX_CONSECUTIVE_LOSSES} Consecutive Losses or -${MAX_DAILY_LOSS} Daily")
         logger.info("=" * 60)
 
