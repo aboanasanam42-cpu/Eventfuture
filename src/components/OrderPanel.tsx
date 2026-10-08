@@ -43,10 +43,10 @@ export const OrderPanel: React.FC<OrderPanelProps> = ({
         <div className="flex items-center justify-between pb-3 border-b border-slate-800">
           <div>
             <h3 className="text-base font-bold text-white">
-              {lang === 'ar' ? 'لوحة تنفيذ العقود وإدارة المخاطر' : 'Order Execution & Risk Controller'}
+              {lang === 'ar' ? 'محاكي العقود وإدارة المخاطر' : 'Contract Simulator & Risk Controller'}
             </h3>
             <p className="text-xs text-slate-400 font-mono">
-              {lang === 'ar' ? 'عقد أحداث لمدة 10 دقائق (BTCUSDT)' : '10-Minute Event Futures Contract'}
+              {lang === 'ar' ? 'محاكاة دورة 10 دقائق (BTCUSDT) — دون أوامر حقيقية' : '10-Minute Paper Simulation — no real orders'}
             </p>
           </div>
 
@@ -61,12 +61,12 @@ export const OrderPanel: React.FC<OrderPanelProps> = ({
               {lang === 'ar' ? 'محاكاة (Paper)' : 'Simulation'}
             </button>
             <button
-              onClick={() => onUpdateConfig({ tradingMode: 'live' })}
-              className={`px-3 py-1 rounded-lg transition ${
-                !isSim ? 'bg-amber-500 text-slate-950 font-bold shadow-md shadow-amber-500/20' : 'text-slate-400 hover:text-white'
-              }`}
+              type="button"
+              disabled
+              title={lang === 'ar' ? 'التداول الحقيقي غير متاح حتى توثيق واجهة عقود الأحداث' : 'Unavailable until MEXC documents an Event Futures order API'}
+              className="px-3 py-1 rounded-lg text-slate-600 cursor-not-allowed"
             >
-              {lang === 'ar' ? 'حقيقي (Live MEXC)' : 'Live API'}
+              {lang === 'ar' ? 'الحقيقي غير متاح' : 'Live unavailable'}
             </button>
           </div>
         </div>
@@ -78,7 +78,7 @@ export const OrderPanel: React.FC<OrderPanelProps> = ({
               {lang === 'ar' ? 'المبلغ (USDT)' : 'Contract Amount (USDT)'}
             </label>
             <div className="text-[11px] text-slate-500 font-mono">
-              {lang === 'ar' ? 'عائد ثابت: 80%' : 'Fixed Payout: 80%'}
+              {lang === 'ar' ? 'افتراض المحاكاة: 80% فقط' : 'Simulation assumption: 80% only'}
             </div>
           </div>
 
@@ -123,13 +123,13 @@ export const OrderPanel: React.FC<OrderPanelProps> = ({
           {/* Mathematical Payout Preview (Exact from screenshot OCR page 5) */}
           <div className="grid grid-cols-2 gap-2 p-3 rounded-xl bg-slate-950/60 border border-slate-800/80 font-mono text-xs">
             <div>
-              <div className="text-slate-500 text-[10px]">{lang === 'ar' ? 'مبلغ التسوية الإجمالي' : 'Settlement Total'}</div>
+              <div className="text-slate-500 text-[10px]">{lang === 'ar' ? 'إجمالي افتراضي بالمحاكاة' : 'Simulated Settlement Total'}</div>
               <div className="text-sm font-bold text-emerald-400">
                 ${settlementAmount} USDT
               </div>
             </div>
             <div>
-              <div className="text-slate-500 text-[10px]">{lang === 'ar' ? 'الربح الصافي في حال الفوز' : 'Net Win Profit (+80%)'}</div>
+              <div className="text-slate-500 text-[10px]">{lang === 'ar' ? 'ربح افتراضي عند الفوز' : 'Simulated Win Profit (+80%)'}</div>
               <div className="text-sm font-bold text-cyan-400">
                 +${netProfit} USDT
               </div>
@@ -149,7 +149,7 @@ export const OrderPanel: React.FC<OrderPanelProps> = ({
               <span>{lang === 'ar' ? 'أعلى' : 'UP (Call)'}</span>
             </div>
             <span className="text-[10px] text-emerald-200 font-mono font-normal">
-              {lang === 'ar' ? `دفع أعلى 80% • $${settlementAmount}` : `80% Return • $${settlementAmount}`}
+              {lang === 'ar' ? `عائد افتراضي 80% • ${settlementAmount}` : `Simulated 80% • ${settlementAmount}`}
             </span>
           </button>
 
@@ -163,7 +163,7 @@ export const OrderPanel: React.FC<OrderPanelProps> = ({
               <span>{lang === 'ar' ? 'أقل' : 'DOWN (Put)'}</span>
             </div>
             <span className="text-[10px] text-rose-200 font-mono font-normal">
-              {lang === 'ar' ? `دفع أقل 80% • $${settlementAmount}` : `80% Return • $${settlementAmount}`}
+              {lang === 'ar' ? `عائد افتراضي 80% • ${settlementAmount}` : `Simulated 80% • ${settlementAmount}`}
             </span>
           </button>
         </div>

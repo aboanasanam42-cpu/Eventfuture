@@ -35,6 +35,13 @@ SPOT_BASE = "https://api.mexc.com"
 
 class MexcEventBot:
     def __init__(self):
+        if TRADING_MODE == "live":
+            raise RuntimeError(
+                "LIVE TRADING BLOCKED: this Python worker does not submit verified MEXC Event Futures orders. "
+                "Set TRADING_MODE=simulation; no live order will be attempted."
+            )
+        if TRADING_MODE != "simulation":
+            raise RuntimeError("TRADING_MODE must be 'simulation' until a documented event-order API is available.")
         self.daily_pnl = 0.0
         self.consecutive_losses = 0
         self.is_halted = False
@@ -43,9 +50,9 @@ class MexcEventBot:
         self.last_reset_day = datetime.now(timezone.utc).day
 
         logger.info("=" * 60)
-        logger.info("🚀 MEXC EVENT FUTURES (عقود الأحداث) 10-MINUTE BOT ACTIVE")
+        logger.info("MEXC EVENT FUTURES 10-MINUTE PAPER SIMULATOR ACTIVE — NO REAL ORDERS")
         logger.info(f"Target: {SYMBOL} | Expiry Cycle: {CYCLE_MINUTES} Minutes | Mode: {TRADING_MODE.upper()}")
-        logger.info(f"Fixed Stake: {TRADE_AMOUNT} USDT | Payout: 80% (Gross Return: ${TRADE_AMOUNT * 1.8:.2f})")
+        logger.info(f"Simulation stake: {TRADE_AMOUNT} USDT | Assumed payout: 80% (not an exchange quote)")
         logger.info(f"Risk Limits: Stop at {MAX_CONSECUTIVE_LOSSES} Consecutive Losses or -${MAX_DAILY_LOSS} Daily")
         logger.info("=" * 60)
 
@@ -62,16 +69,21 @@ class MexcEventBot:
             if r.status_code == 200:
                 d = r.json()
                 if d.get("success") and d.get("data"):
-                    return float(d["data"].get("lastPrice") or d["data"].get("fairPrice") or 81280)
+                    price = float(d["data"].get("lastPrice") or d["data"].get("fairPrice") or 0)
+                    if math.isfinite(price) and price > 0:
+                        return price
         except Exception:
             pass
         try:
             r = requests.get(f"{SPOT_BASE}/api/v3/ticker/price?symbol={SYMBOL.replace('_', '')}", timeout=5)
             if r.status_code == 200:
-                return float(r.json().get("price", 81280))
+                price = float(r.json().get("price") or 0)
+                if math.isfinite(price) and price > 0:
+                    return price
         except Exception:
             pass
-        return 81280.0
+        logger.warning("No valid live ticker received from MEXC contract or spot API.")
+        return None
 
     def fetch_15m_candles(self, limit=50):
         symbol_fmt = f"{SYMBOL.replace('USDT', '')}_USDT" if "_" not in SYMBOL else SYMBOL
@@ -81,7 +93,7 @@ class MexcEventBot:
                 d = r.json()
                 if d.get("success") and d.get("data"):
                     closes = [float(c) for c in d["data"].get("close", [])]
-                    if len(closes) >= 20:
+                    if len(closes) >= 20 and all(math.isfinite(x) and x > 0 for x in closes):
                         return closes
         except Exception:
             pass
@@ -91,11 +103,13 @@ class MexcEventBot:
             if r.status_code == 200:
                 data = r.json()
                 closes = [float(k[4]) for k in data]
-                return closes
+                if len(closes) >= 20 and all(math.isfinite(x) and x > 0 for x in closes):
+                    return closes
         except Exception:
             pass
 
-        return [81280.0 + (i * 10) for i in range(30)]
+        logger.warning("No valid live candles received from MEXC; signal generation is paused.")
+        return []
 
     def calculate_rsi(self, closes, period=14):
         if len(closes) <= period:
@@ -136,6 +150,16 @@ class MexcEventBot:
 
     def generate_signal(self):
         closes = self.fetch_15m_candles()
+        if len(closes) < 20:
+            return {
+                "direction": "NEUTRAL",
+                "direction_ar": "محايد",
+                "rsi": 50.0,
+                "bb_lower": 0.0,
+                "bb_upper": 0.0,
+                "last_price": closes[-1] if closes else 0.0,
+                "reasons": "No verified live candles; trade skipped"
+            }
         rsi = self.calculate_rsi(closes)
         upper, middle, lower, pct_b = self.calculate_bollinger_bands(closes)
         last_price = closes[-1]
@@ -181,6 +205,9 @@ class MexcEventBot:
             return
 
         current_price = self.fetch_ticker()
+        if current_price is None or not math.isfinite(current_price) or current_price <= 0:
+            logger.error("Trade skipped because no valid live MEXC price is available.")
+            return
         now = time.time()
         expiry = now + (CYCLE_MINUTES * 60)
         direction_ar = "أعلى" if direction == "UP" else "أقل"
@@ -202,6 +229,9 @@ class MexcEventBot:
             return
 
         settle_price = self.fetch_ticker()
+        if settle_price is None or not math.isfinite(settle_price) or settle_price <= 0:
+            logger.error("Settlement delayed: no valid live MEXC price is available.")
+            return
         contract = self.active_contract
         diff = settle_price - contract["entry_price"]
         won = (contract["direction"] == "UP" and diff > 0) or (contract["direction"] == "DOWN" and diff < 0)

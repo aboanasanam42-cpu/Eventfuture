@@ -44,7 +44,7 @@ git push -u origin main`;
     { key: 'MAX_CONSECUTIVE_LOSSES', val: '3', desc: 'Streak breaker (3 consecutive losses)' },
     { key: 'TRAILING_TP_ENABLED', val: 'false', desc: 'Trailing Take-Profit enabled' },
     { key: 'PYTHONUNBUFFERED', val: '1', desc: 'Ensure Python logs stream immediately in Railway' },
-    { key: 'TRADING_MODE', val: 'simulation', desc: '"simulation" (paper mode) or "live" (real orders)' },
+    { key: 'TRADING_MODE', val: 'simulation', desc: '"simulation" only; Event Futures live orders are disabled' },
     { key: 'PORT', val: '3000', desc: 'Port provided by Railway ($PORT)' },
   ];
 
