@@ -1,0 +1,6 @@
+{
+  "name": "MEXC Event Futures 10m Trading Bot",
+  "description": "Automated 24/7 quantitative trading bot and terminal for MEXC Event Futures BTCUSDT 10-minute cycles using 15m RSI and Bollinger Bands indicators with strict risk management.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
