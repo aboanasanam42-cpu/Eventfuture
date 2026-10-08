@@ -1,18 +1,16 @@
 """
-MEXC Event Futures (العقود الآجلة للأحداث) 10-Minute Quantitative Trading Bot
-Entry point for Railway worker (main.py)
+MEXC Event Futures strategy simulator entry point.
+This worker does not submit real exchange orders.
 """
-import sys
-import os
+from bot import MexcEventBot
 
-# Delegate directly to our Event Futures Bot
+
 if __name__ == "__main__":
-    from bot import MexcEventBot
     print("=================================================================")
-    print(" 🚀 STARTING MEXC EVENT FUTURES 10-MINUTE QUANTITATIVE BOT       ")
-    print(" Strategy: 10m Binary Expiry Cycles on BTCUSDT (15m Indicators) ")
-    print(" Fixed Stake: 3.00 USDT | Return: 80% (5.40 USDT)               ")
-    print(" Risk Circuit Breaker: 3 Consecutive Losses / $9 Daily Loss Max  ")
+    print(" MEXC EVENT FUTURES 10-MINUTE PAPER SIMULATOR                    ")
+    print(" Market source: live MEXC public data when available             ")
+    print(" Execution: SIMULATION ONLY — NO REAL EXCHANGE ORDERS            ")
+    print(" The 80% payout is a local assumption, not an exchange guarantee ")
     print("=================================================================")
     bot = MexcEventBot()
     bot.run_loop()
