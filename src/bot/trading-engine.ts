@@ -29,8 +29,10 @@ export class TradingEngine {
   private isEmergencyHalted = false;
   private haltReason = '';
   private lastResetDay = new Date().getUTCDate();
+  private lastDataErrorLogAt = 0;
 
   constructor(initialConfig: Partial<BotConfig> = {}) {
+    const requestedMode = String(initialConfig.tradingMode || process.env.TRADING_MODE || 'simulation').toLowerCase();
     this.config = {
       symbol: initialConfig.symbol || process.env.SYMBOL || 'BTCUSDT',
       tradeAmount: initialConfig.tradeAmount || parseFloat(process.env.TRADE_AMOUNT_USDT || '3.0'),
@@ -38,15 +40,20 @@ export class TradingEngine {
       timeframe: initialConfig.timeframe || process.env.TIMEFRAME_INDICATOR || '15m',
       maxDailyLoss: initialConfig.maxDailyLoss || parseFloat(process.env.MAX_DAILY_LOSS_USDT || '9.0'),
       maxConsecutiveLosses: initialConfig.maxConsecutiveLosses || parseInt(process.env.MAX_CONSECUTIVE_LOSSES || '3', 10),
-      tradingMode: (initialConfig.tradingMode || process.env.TRADING_MODE || 'simulation') as 'simulation' | 'live',
+      // This app models fixed-expiry Event Futures; MEXC's documented order API is for standard futures.
+      // Keep the engine simulation-only until the exact event product is officially supported.
+      tradingMode: 'simulation',
       mexcApiKey: initialConfig.mexcApiKey || process.env.MEXC_API_KEY || '',
       mexcApiSecret: initialConfig.mexcApiSecret || process.env.MEXC_SECRET_KEY || process.env.MEXC_API_SECRET || '',
       autoTrade: initialConfig.autoTrade ?? true,
     };
 
     this.client = new MexcClient(this.config.mexcApiKey, this.config.mexcApiSecret);
-    this.addLog('SYSTEM', 'info', `Initialized MEXC Event Futures Trading Engine for ${this.config.symbol} (10m cycles)`);
-    this.addLog('RISK', 'info', `Risk Rules: Max consecutive losses = ${this.config.maxConsecutiveLosses}, Daily loss limit = $${this.config.maxDailyLoss}`);
+    this.addLog('SYSTEM', 'info', `Initialized MEXC Event Futures simulator for ${this.config.symbol} (${this.config.cycleMinutes}m cycles)`);
+    if (requestedMode === 'live') {
+      this.addLog('API', 'error', 'TRADING_MODE=live was blocked. This repository targets fixed-expiry event contracts, but only standard futures order endpoints are documented by MEXC. No real orders will be sent.');
+    }
+    this.addLog('RISK', 'info', `Risk Rules: Max consecutive losses = ${this.config.maxConsecutiveLosses}, Daily loss limit = ${this.config.maxDailyLoss}`);
   }
 
   public getClient(): MexcClient {
@@ -54,11 +61,16 @@ export class TradingEngine {
   }
 
   public updateConfig(newConfig: Partial<BotConfig>) {
-    this.config = { ...this.config, ...newConfig };
+    const requestedLive = newConfig.tradingMode === 'live';
+    const safeConfig = { ...newConfig, ...(requestedLive ? { tradingMode: 'simulation' as const } : {}) };
+    this.config = { ...this.config, ...safeConfig, tradingMode: 'simulation' };
     if (newConfig.mexcApiKey !== undefined || newConfig.mexcApiSecret !== undefined) {
       this.client.setCredentials(this.config.mexcApiKey || '', this.config.mexcApiSecret || '');
     }
-    this.addLog('SYSTEM', 'info', `Bot configuration updated: Mode=${this.config.tradingMode}, AutoTrade=${this.config.autoTrade}, Stake=$${this.config.tradeAmount}`);
+    if (requestedLive) {
+      this.addLog('API', 'error', 'Live Event Futures mode is disabled because the event-order endpoint is not documented by MEXC. Continuing in simulation; no real order was sent.');
+    }
+    this.addLog('SYSTEM', 'info', `Bot configuration updated: Mode=${this.config.tradingMode}, AutoTrade=${this.config.autoTrade}, Stake=${this.config.tradeAmount}`);
   }
 
   public getConfig(): BotConfig {
@@ -146,7 +158,16 @@ export class TradingEngine {
       const indicators = analyzeMarket(candles);
       this.currentIndicators = indicators;
     } catch (err: any) {
-      // Silent catch for intermittent network hiccup
+      // Never retain stale prices or candles when live market data cannot be fetched.
+      this.currentTicker = null;
+      this.currentIndicators = null;
+      this.candles = [];
+      const now = Date.now();
+      if (now - this.lastDataErrorLogAt >= 30000) {
+        const message = err instanceof Error ? err.message : String(err);
+        this.addLog('API', 'error', `Live market data unavailable; new trades are paused. ${message}`);
+        this.lastDataErrorLogAt = now;
+      }
     }
   }
 
@@ -156,7 +177,10 @@ export class TradingEngine {
   private async evaluateCycleTick() {
     const now = Date.now();
     const cycleMs = this.config.cycleMinutes * 60 * 1000;
-    const currentPrice = this.currentTicker?.lastPrice || 81280;
+    const currentPrice = this.currentTicker?.lastPrice;
+    if (!Number.isFinite(currentPrice) || currentPrice === undefined || currentPrice <= 0) {
+      return; // Wait for a verified live ticker; never settle on a fabricated price.
+    }
 
     // 1. Check active contract settlement
     if (this.activeContract && this.activeContract.status === 'OPEN') {
@@ -198,7 +222,15 @@ export class TradingEngine {
       return null;
     }
 
-    const currentPrice = this.currentTicker?.lastPrice || 81280;
+    if (this.config.tradingMode !== 'simulation') {
+      this.addLog('API', 'error', 'Live Event Futures execution is disabled. No order was sent.');
+      return null;
+    }
+    const currentPrice = this.currentTicker?.lastPrice;
+    if (!Number.isFinite(currentPrice) || currentPrice === undefined || currentPrice <= 0) {
+      this.addLog('API', 'error', 'Trade skipped because no valid live MEXC ticker is available.');
+      return null;
+    }
     const now = Date.now();
     const cycleMs = this.config.cycleMinutes * 60 * 1000;
     const expiryTime = now + cycleMs;
@@ -219,24 +251,6 @@ export class TradingEngine {
       status: 'OPEN',
       mode: this.config.tradingMode,
     };
-
-    if (this.config.tradingMode === 'live') {
-      this.addLog('API', 'info', `Sending live order to MEXC Event Futures: ${direction} ${trade.amount} USDT...`);
-      const apiResult = await this.client.executeEventTrade({
-        symbol: this.config.symbol,
-        direction,
-        amount: trade.amount,
-        durationMinutes: this.config.cycleMinutes,
-      });
-
-      if (!apiResult.success) {
-        trade.status = 'LOST';
-        trade.error = apiResult.error;
-        this.addLog('API', 'error', `MEXC live order rejected: ${apiResult.error}`);
-        return null;
-      }
-      trade.orderId = apiResult.orderId;
-    }
 
     this.activeContract = trade;
     this.trades.unshift(trade);
@@ -329,13 +343,13 @@ export class TradingEngine {
       isRunning: this.isRunning,
       tradingMode: this.config.tradingMode,
       symbol: this.config.symbol,
-      currentPrice: this.currentTicker?.lastPrice || 81281,
-      indexPrice: this.currentTicker?.indexPrice || 81281,
-      priceChange24h: this.currentTicker?.riseFallRate || -0.0185,
-      high24h: this.currentTicker?.high24Price || 83606.5,
-      low24h: this.currentTicker?.lower24Price || 80832.2,
-      volume24h: this.currentTicker?.volume24 || 24519,
-      lastUpdated: this.currentTicker?.timestamp || Date.now(),
+      currentPrice: this.currentTicker?.lastPrice || 0,
+      indexPrice: this.currentTicker?.indexPrice || 0,
+      priceChange24h: this.currentTicker?.riseFallRate || 0,
+      high24h: this.currentTicker?.high24Price || 0,
+      low24h: this.currentTicker?.lower24Price || 0,
+      volume24h: this.currentTicker?.volume24 || 0,
+      lastUpdated: this.currentTicker?.timestamp || 0,
       cycleSecondsRemaining,
       cycleProgress,
       activeContract: this.activeContract,
@@ -349,7 +363,7 @@ export class TradingEngine {
       winRate,
       indicators: this.currentIndicators,
       hasApiKeys: this.client.hasCredentials(),
-      apiConnected: this.client.hasCredentials(),
+      apiConnected: this.client.isConnected(),
     };
   }
 
