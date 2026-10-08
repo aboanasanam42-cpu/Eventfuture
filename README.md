@@ -1,7 +1,11 @@
-# MEXC Event Futures 10-Minute Quantitative Trading Bot
-### بوت التداول الكمي الآلي لعقود الأحداث MEXC (العقود الآجلة للأحداث - دورة 10 دقائق)
+# MEXC Eventfuture — 10-Minute Strategy Dashboard
+### لوحة استراتيجية MEXC لدورة 10 دقائق
 
-Production-ready automated real-time trading system for **MEXC Event Futures (BTCUSDT)** executing on **10-minute expiry cycles** guided by **15-minute RSI & Bollinger Bands** quantitative indicators with automated risk management.
+> **الحالة الحقيقية للمشروع:** هذا المستودع حالياً لوحة تحكم ومحاكي تداول (Paper Trading)، وليس بوتاً ينفذ عقود أحداث حقيقية على MEXC. واجهة MEXC Futures الرسمية التي أمكن التحقق منها توثّق أوامر العقود الآجلة التقليدية عبر `POST /api/v1/private/order/create`، ولا تثبت وجود واجهة `event/order/create` لعقود أحداث ذات انتهاء ثابت. لذلك يمنع المشروع وضع التداول الحقيقي بدلاً من الادعاء بأنه نجح.
+>
+> **تنبيه أمني عاجل:** سبق رفع ملف `.env` إلى هذا المستودع العام. احذفنا الملف من النسخة الحالية، لكن حذف الملف لا يمحو نسخ Git السابقة؛ اعتبر أي مفتاح كان داخله مكشوفاً، وألغِه وأنشئ مفاتيح جديدة من MEXC قبل استخدام الحساب. خزّن القيم الجديدة في متغيرات Railway السرية فقط، ولا ترفعها إلى GitHub.
+
+This project provides a web dashboard, live market-data analysis when MEXC endpoints respond, and simulation-only 10-minute signals using 15-minute RSI and Bollinger Bands. Simulation results are not exchange fills and do not represent guaranteed returns.
 
 ---
 
@@ -13,9 +17,9 @@ As documented in the official MEXC Event Futures framework:
 3. **Quantitative Consensus:**
    - **RSI (14 Period):** Detects overbought ($RSI \ge 70$) for `DOWN (أقل)` reversal, and oversold ($RSI \le 30$) for `UP (أعلى)` bounce.
    - **Bollinger Bands (20, 2):** Detects band touches (%b $\le 0.15$ for Mean Reversion `UP`, and %b $\ge 0.85$ for Rejection `DOWN`).
-4. **Order Execution:**
-   - Fixed Position Stake: **3.00 USDT** per contract.
-   - Fixed Return Ratio: **80% Payout** (Gross Return: **5.40 USDT**, Net Profit: **+2.40 USDT** on win, **-3.00 USDT** on loss).
+4. **Execution status:**
+   - Trades are paper/simulation records only; the displayed 80% payout is a simulation assumption, not a verified MEXC Event Futures payout.
+   - No real order is submitted and no exchange settlement is queried.
 5. **Strict Risk Management (إدارة رأس المال وحماية المحفظة):**
    - **Consecutive Loss Safety:** Stops trading immediately after **3 consecutive losses** (saving capital from revenge trading / "تجنب فخ الانتقام والتداول العاطفي").
    - **Max Daily Loss Limit:** Default **$9.00 USDT** per 24h trading day (resets at 00:00 UTC).
@@ -63,17 +67,17 @@ git push -u origin main
 | `TIMEFRAME_INDICATOR` | `15m` | Candlestick Indicator Timeframe |
 | `MAX_DAILY_LOSS_USDT` | `9.0` | Daily Loss Limit Circuit Breaker |
 | `MAX_CONSECUTIVE_LOSSES` | `3` | Maximum Consecutive Losses Allowed |
-| `TRADING_MODE` | `simulation` or `live` | Simulation (Safe Paper) or Live |
+| `TRADING_MODE` | `simulation` | Simulation only; live Event Futures execution is blocked |
 | `PORT` | `3000` | Server HTTP Port |
 
-Railway will automatically build, deploy, and keep the process running 24/7!
+Railway can build and run the dashboard as a web service. Availability depends on your Railway plan and deployment health; do not assume 24/7 uptime without monitoring.
 
 ---
 
 ## 📁 Repository Structure
 
 ```
-├── bot.py                     # Standalone Python 3 background worker
+├── bot.py                     # Standalone Python 3 simulation worker (no live orders)
 ├── requirements.txt           # Python dependencies (requests, numpy, python-dotenv)
 ├── server.ts                  # Express full-stack API server & worker host
 ├── package.json               # Node.js dependencies & scripts
