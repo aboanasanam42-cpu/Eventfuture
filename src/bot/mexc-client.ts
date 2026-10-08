@@ -74,7 +74,7 @@ export class MexcClient {
               volume: Number(vols[i] || 0),
             });
           }
-          if (candles.length > 0) {
+          if (candles.length >= 20) {
             return candles.sort((a, b) => a.time - b.time);
           }
         }
@@ -90,7 +90,7 @@ export class MexcClient {
       const res = await fetch(spotUrl, { headers: { 'Accept': 'application/json' } });
       if (res.ok) {
         const data = (await res.json()) as any[];
-        if (Array.isArray(data) && data.length > 0) {
+        if (Array.isArray(data) && data.length >= 20) {
           return data.map((item) => ({
             time: Number(item[0]),
             open: parseFloat(item[1]),
@@ -105,8 +105,7 @@ export class MexcClient {
       // Fall through to synthetic generation if offline
     }
 
-    // Fallback: Generate realistic seed candles based on approximate current BTC price (~81,300)
-    return this.generateFallbackCandles(limit);
+    throw new Error('Unable to fetch at least 20 live MEXC candles from contract or spot endpoints; trading data is unavailable.');
   }
 
   /**
@@ -122,15 +121,19 @@ export class MexcClient {
         const json = (await res.json()) as any;
         if (json.success && json.data) {
           const d = json.data;
+          const lastPrice = Number(d.lastPrice ?? d.fairPrice);
+          if (!Number.isFinite(lastPrice) || lastPrice <= 0) {
+            throw new Error('Invalid live contract ticker response');
+          }
           return {
             symbol,
-            lastPrice: Number(d.lastPrice || d.fairPrice || 81280),
-            fairPrice: Number(d.fairPrice || d.lastPrice || 81280),
-            indexPrice: Number(d.indexPrice || d.lastPrice || 81280),
-            riseFallRate: Number(d.riseFallRate || 0),
-            high24Price: Number(d.high24Price || d.lastPrice * 1.02),
-            lower24Price: Number(d.lower24Price || d.lastPrice * 0.98),
-            volume24: Number(d.volume24 || 15420),
+            lastPrice,
+            fairPrice: Number(d.fairPrice ?? lastPrice),
+            indexPrice: Number(d.indexPrice ?? lastPrice),
+            riseFallRate: Number(d.riseFallRate ?? 0),
+            high24Price: Number(d.high24Price ?? lastPrice),
+            lower24Price: Number(d.lower24Price ?? lastPrice),
+            volume24: Number(d.volume24 ?? 0),
             timestamp: Date.now(),
           };
         }
@@ -144,16 +147,19 @@ export class MexcClient {
       const res = await fetch(`${this.spotBaseUrl}/api/v3/ticker/24hr?symbol=${rawSymbol}`);
       if (res.ok) {
         const d = (await res.json()) as any;
-        const last = parseFloat(d.lastPrice || '81280');
+        const last = Number(d.lastPrice);
+        if (!Number.isFinite(last) || last <= 0) {
+          throw new Error('Invalid live spot ticker response');
+        }
         return {
           symbol,
           lastPrice: last,
           fairPrice: last,
           indexPrice: last,
-          riseFallRate: parseFloat(d.priceChangePercent || '0') / 100,
-          high24Price: parseFloat(d.highPrice || `${last * 1.02}`),
-          lower24Price: parseFloat(d.lowPrice || `${last * 0.98}`),
-          volume24: parseFloat(d.volume || '15000'),
+          riseFallRate: Number(d.priceChangePercent ?? 0) / 100,
+          high24Price: Number(d.highPrice ?? last),
+          lower24Price: Number(d.lowPrice ?? last),
+          volume24: Number(d.volume ?? 0),
           timestamp: Date.now(),
         };
       }
@@ -161,17 +167,7 @@ export class MexcClient {
       // Fallback
     }
 
-    return {
-      symbol,
-      lastPrice: 81281.0,
-      fairPrice: 81281.0,
-      indexPrice: 81281.0,
-      riseFallRate: -0.0185,
-      high24Price: 83606.5,
-      lower24Price: 80832.2,
-      volume24: 24519,
-      timestamp: Date.now(),
-    };
+    throw new Error('Unable to fetch a valid live MEXC contract or spot ticker; no synthetic price will be used.');
   }
 
   /**
@@ -281,31 +277,4 @@ export class MexcClient {
     }
   }
 
-  private generateFallbackCandles(count: number): Candle[] {
-    const candles: Candle[] = [];
-    let current = 81280;
-    const now = Date.now();
-    const intervalMs = 15 * 60 * 1000;
-
-    for (let i = count; i >= 0; i--) {
-      const time = now - i * intervalMs;
-      const variation = (Math.random() - 0.5) * 160;
-      const open = current;
-      const close = current + variation;
-      const high = Math.max(open, close) + Math.random() * 80;
-      const low = Math.min(open, close) - Math.random() * 80;
-      const volume = 20 + Math.random() * 80;
-
-      candles.push({
-        time,
-        open: Number(open.toFixed(2)),
-        high: Number(high.toFixed(2)),
-        low: Number(low.toFixed(2)),
-        close: Number(close.toFixed(2)),
-        volume: Number(volume.toFixed(2)),
-      });
-      current = close;
-    }
-    return candles;
-  }
 }
