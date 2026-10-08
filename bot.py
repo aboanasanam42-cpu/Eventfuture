@@ -42,9 +42,12 @@ class MexcEventBot:
         self.active_contract = None
         self.last_reset_day = datetime.now(timezone.utc).day
 
-        logger.info(f"Initialized MEXC Event Futures Bot for {SYMBOL}")
-        logger.info(f"Mode: {TRADING_MODE.upper()} | Stake: {TRADE_AMOUNT} USDT | 10m Cycles | 15m Indicators")
-        logger.info(f"Risk Limits: Max Consec Losses: {MAX_CONSECUTIVE_LOSSES} | Max Daily Loss: ${MAX_DAILY_LOSS}")
+        logger.info("=" * 60)
+        logger.info("🚀 MEXC EVENT FUTURES (عقود الأحداث) 10-MINUTE BOT ACTIVE")
+        logger.info(f"Target: {SYMBOL} | Expiry Cycle: {CYCLE_MINUTES} Minutes | Mode: {TRADING_MODE.upper()}")
+        logger.info(f"Fixed Stake: {TRADE_AMOUNT} USDT | Payout: 80% (Gross Return: ${TRADE_AMOUNT * 1.8:.2f})")
+        logger.info(f"Risk Limits: Stop at {MAX_CONSECUTIVE_LOSSES} Consecutive Losses or -${MAX_DAILY_LOSS} Daily")
+        logger.info("=" * 60)
 
     def sign(self, body_str: str, req_time: int) -> str:
         if not MEXC_API_SECRET:

@@ -1,3 +1,3 @@
 web: npm start
-worker: npm run worker
-worker-py: python3 bot.py
+worker: python3 main.py
+worker-node: npm run worker
