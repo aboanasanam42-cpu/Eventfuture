@@ -149,7 +149,7 @@ export const OrderPanel: React.FC<OrderPanelProps> = ({
               <span>{lang === 'ar' ? 'أعلى' : 'UP (Call)'}</span>
             </div>
             <span className="text-[10px] text-emerald-200 font-mono font-normal">
-              {lang === 'ar' ? `دفع أعلى 80% • $${settlementAmount}` : `80% Return • $${settlementAmount}`}
+              {lang === 'ar' ? `عائد افتراضي 80% • ${settlementAmount}` : `Simulated 80% • ${settlementAmount}`}
             </span>
           </button>
 
@@ -163,7 +163,7 @@ export const OrderPanel: React.FC<OrderPanelProps> = ({
               <span>{lang === 'ar' ? 'أقل' : 'DOWN (Put)'}</span>
             </div>
             <span className="text-[10px] text-rose-200 font-mono font-normal">
-              {lang === 'ar' ? `دفع أقل 80% • $${settlementAmount}` : `80% Return • $${settlementAmount}`}
+              {lang === 'ar' ? `عائد افتراضي 80% • ${settlementAmount}` : `Simulated 80% • ${settlementAmount}`}
             </span>
           </button>
         </div>
