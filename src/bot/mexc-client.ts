@@ -18,6 +18,7 @@ export class MexcClient {
   private apiSecret: string;
   private contractBaseUrl = 'https://contract.mexc.com';
   private spotBaseUrl = 'https://api.mexc.com';
+  private connectionVerified = false;
 
   constructor(apiKey = '', apiSecret = '') {
     this.apiKey = apiKey.trim();
@@ -31,6 +32,10 @@ export class MexcClient {
 
   public hasCredentials(): boolean {
     return Boolean(this.apiKey && this.apiSecret);
+  }
+
+  public isConnected(): boolean {
+    return this.connectionVerified;
   }
 
   /**
@@ -174,6 +179,7 @@ export class MexcClient {
    * Verify API credentials connectivity
    */
   public async testConnection(): Promise<{ success: boolean; message: string; balance?: number }> {
+    this.connectionVerified = false;
     if (!this.hasCredentials()) {
       return { success: false, message: 'Missing API Key or API Secret' };
     }
@@ -195,6 +201,7 @@ export class MexcClient {
 
       const json = (await res.json()) as any;
       if (json.success) {
+        this.connectionVerified = true;
         const usdtAsset = json.data?.find((a: any) => a.currency === 'USDT');
         return {
           success: true,
@@ -202,12 +209,14 @@ export class MexcClient {
           balance: usdtAsset ? Number(usdtAsset.availableBalance) : undefined,
         };
       } else {
+        this.connectionVerified = false;
         return {
           success: false,
           message: json.message || `MEXC API error code ${json.code}`,
         };
       }
     } catch (err: any) {
+      this.connectionVerified = false;
       return {
         success: false,
         message: err.message || 'Network error connecting to MEXC endpoint',
@@ -218,63 +227,24 @@ export class MexcClient {
   /**
    * Submit 10-Minute Event Futures Order (or standard contract order)
    */
-  public async executeEventTrade(params: {
+  /**
+   * Event Futures execution is intentionally disabled.
+   *
+   * The currently documented MEXC Futures API exposes standard contract orders,
+   * but this project targets fixed-expiry event contracts and must not treat a
+   * standard perpetual-futures order as an equivalent product. The previously
+   * used /api/v1/private/event/order/create endpoint is not present in the
+   * official Futures API reference, so submitting to it would be unverified.
+   */
+  public async executeEventTrade(_params: {
     symbol: string;
     direction: 'UP' | 'DOWN';
     amount: number;
     durationMinutes: number;
   }): Promise<{ success: boolean; orderId?: string; error?: string }> {
-    if (!this.hasCredentials()) {
-      return {
-        success: false,
-        error: 'Live execution requires MEXC_API_KEY and MEXC_API_SECRET.',
-      };
-    }
-
-    try {
-      const timestamp = Date.now();
-      const payload = {
-        symbol: params.symbol.includes('_') ? params.symbol : `${params.symbol.replace('USDT', '')}_USDT`,
-        direction: params.direction === 'UP' ? 1 : 2, // 1: Call/Up (أعلى), 2: Put/Down (أقل)
-        period: `${params.durationMinutes}m`, // '10m'
-        amount: params.amount,
-        type: 'EVENT_OPTION',
-      };
-
-      const bodyStr = JSON.stringify(payload);
-      const signature = this.generateSignature(bodyStr, timestamp);
-
-      // Attempt Event Futures order endpoint
-      const res = await fetch(`${this.contractBaseUrl}/api/v1/private/event/order/create`, {
-        method: 'POST',
-        headers: {
-          'ApiKey': this.apiKey,
-          'Request-Time': timestamp.toString(),
-          'Signature': signature,
-          'Content-Type': 'application/json',
-        },
-        body: bodyStr,
-      });
-
-      const json = (await res.json()) as any;
-      if (json.success && json.data) {
-        return {
-          success: true,
-          orderId: json.data.orderId || `MEXC-${Date.now()}`,
-        };
-      }
-
-      // If Event Futures endpoint is not directly exposed on user's API tier, test fallback futures micro-order or return clear API message
-      return {
-        success: false,
-        error: json.message || `MEXC Response: ${JSON.stringify(json)}`,
-      };
-    } catch (err: any) {
-      return {
-        success: false,
-        error: err.message || 'Execution error during order submission',
-      };
-    }
+    return {
+      success: false,
+      error: 'Live Event Futures execution is disabled: the required event-order endpoint is not documented by MEXC. No real order was submitted. Simulation only.',
+    };
   }
-
 }
