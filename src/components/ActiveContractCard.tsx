@@ -42,7 +42,7 @@ export const ActiveContractCard: React.FC<ActiveContractCardProps> = ({ contract
             <span className={`relative inline-flex rounded-full h-3 w-3 ${isWinning ? 'bg-emerald-500' : 'bg-rose-500'}`} />
           </span>
           <span className="text-xs font-mono font-bold text-white uppercase tracking-wider">
-            {lang === 'ar' ? 'عقد أحداث نشط (10 دقائق)' : 'Active 10m Event Contract'}
+            {lang === 'ar' ? 'صفقة محاكاة نشطة (10 دقائق)' : 'Active 10m Simulated Trade'}
           </span>
           <span className="text-[11px] font-mono text-slate-400">#{contract.id}</span>
         </div>
